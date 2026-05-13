@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -8,12 +9,22 @@ from app.embeddings import EmbeddingModel
 from app.evaluate import evaluate
 from app.ingest import ingest
 from app.retrieval import retrieve_and_rerank
-from app.schemas import Citation, EvaluationRequest, EvaluationResponse, IngestRequest, IngestResponse, QueryRequest, QueryResponse
-from app.vector_store import VectorStore
+from app.schemas import (
+    Citation,
+    EvaluationRequest,
+    EvaluationResponse,
+    IngestRequest,
+    IngestResponse,
+    QueryRequest,
+    QueryResponse,
+)
+from app.vector_store import CHUNK_MANIFEST, NUMPY_VECTORS, VectorStore
+
+INDEX_FILES = (CHUNK_MANIFEST, NUMPY_VECTORS)
 
 app = FastAPI(
     title="Enterprise RAG Copilot",
-    description="Document QA service with semantic retrieval, reranking, citations, and evaluation.",
+    description="Ask grounded questions over local PDFs, notes, and policy documents.",
     version="1.0.0",
 )
 
@@ -24,17 +35,19 @@ def _store(index_dir: Path | None = None) -> VectorStore:
 
 @app.get("/health")
 def health() -> dict[str, str | bool]:
-    index_ready = (settings.index_dir / "chunks.jsonl").exists() and (settings.index_dir / "vectors.npy").exists()
+    index_ready = all((settings.index_dir / file_name).exists() for file_name in INDEX_FILES)
     return {"status": "ok", "index_ready": index_ready, "index_dir": str(settings.index_dir)}
 
 
 @app.post("/ingest", response_model=IngestResponse)
 def ingest_endpoint(request: IngestRequest) -> IngestResponse:
+    source_dir = Path(request.source_dir)
+    index_dir = Path(request.index_dir) if request.index_dir else None
     try:
-        documents, chunks, index_dir = ingest(Path(request.source_dir), Path(request.index_dir) if request.index_dir else None)
-    except Exception as exc:
+        documents, chunks, written_index = ingest(source_dir, index_dir)
+    except (FileNotFoundError, RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return IngestResponse(documents=documents, chunks=chunks, index_dir=str(index_dir))
+    return IngestResponse(documents=documents, chunks=chunks, index_dir=str(written_index))
 
 
 @app.post("/query", response_model=QueryResponse)
@@ -43,8 +56,8 @@ def query_endpoint(request: QueryRequest) -> QueryResponse:
     try:
         store.load()
         contexts = retrieve_and_rerank(store, request.question, request.top_k, request.rerank_top_n)
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Query failed. Ingest documents first. {exc}") from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=400, detail="No index found. Run /ingest before querying.") from exc
 
     answer = answer_question(request.question, contexts, settings)
     citations = [
@@ -64,6 +77,6 @@ def query_endpoint(request: QueryRequest) -> QueryResponse:
 def evaluate_endpoint(request: EvaluationRequest) -> EvaluationResponse:
     try:
         metrics = evaluate(Path(request.dataset_path), settings.index_dir, request.top_k)
-    except Exception as exc:
+    except (FileNotFoundError, KeyError, json.JSONDecodeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return EvaluationResponse(**metrics)

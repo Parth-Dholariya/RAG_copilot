@@ -1,18 +1,17 @@
 # Enterprise RAG Copilot
 
-A FastAPI-based copilot for querying research papers, university notes, policies, and organizational documents with retrieval-augmented generation, citations, reranking, and evaluation metrics.
+This is a small but complete RAG service for asking questions over PDFs, university notes, research summaries, and policy documents. I built it to look like the kind of document QA workflow used in enterprise search: ingest files, retrieve relevant passages, rerank them, answer with citations, and evaluate whether retrieval is actually working.
 
-## Features
+## What It Does
 
 - PDF, Markdown, and text ingestion
-- Semantic chunking with configurable overlap
-- FAISS vector search when available, with a NumPy fallback index
-- Sentence Transformers embeddings when available, with a deterministic local fallback
-- Hybrid reranking using semantic score and lexical overlap
-- Citation-grounded answers with source file, page, and chunk metadata
-- Optional OpenAI or Gemini answer generation
-- Built-in evaluation for Recall@K, MRR, faithfulness proxy, and answer relevance proxy
-- Dockerized API
+- Paragraph-aware chunking with overlap
+- Vector search with FAISS when installed, plus a NumPy fallback for easy demos
+- Sentence Transformers when available, plus a deterministic local embedding fallback
+- Lightweight reranking that blends semantic similarity and keyword overlap
+- Citation-backed answers with source, page, chunk id, score, and excerpt
+- Optional OpenAI or Gemini generation
+- Evaluation for Recall@K, MRR, answer relevance, and a simple faithfulness proxy
 
 ## Quick Start
 
@@ -24,7 +23,11 @@ python -m app.ingest --source data/sample_docs --index storage/index
 uvicorn app.main:app --reload
 ```
 
-Open `http://127.0.0.1:8000/docs`.
+Open `http://127.0.0.1:8000/docs`. If Windows blocks port `8000`, use another port:
+
+```powershell
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8010
+```
 
 ## Ask A Question
 
@@ -36,7 +39,7 @@ curl -X POST http://127.0.0.1:8000/query `
 
 ## Optional LLM Providers
 
-The project runs with an extractive grounded answerer by default. To enable hosted generation:
+The default answerer is extractive, so the app can run without an API key. For stronger natural-language responses, install the optional integrations:
 
 ```powershell
 pip install -r requirements-optional.txt
@@ -56,7 +59,7 @@ $env:GEMINI_API_KEY="..."
 
 ## Evaluation
 
-Edit `eval/qa_pairs.jsonl` with expected source files and run:
+The sample evaluation file is intentionally tiny. Add your own questions and expected source files to `eval/qa_pairs.jsonl`, then run:
 
 ```powershell
 python -m app.evaluate --dataset eval/qa_pairs.jsonl --index storage/index --top-k 5
@@ -66,7 +69,7 @@ Metrics include:
 
 - `recall_at_k`: Whether the expected source appears in retrieved contexts
 - `mrr`: Rank quality for expected supporting documents
-- `faithfulness`: Fraction of answer sentences supported by retrieved contexts
+- `faithfulness`: Rough support check for answer sentences against retrieved context
 - `answer_relevance`: Token overlap between question and answer
 
 ## API Endpoints
@@ -75,6 +78,20 @@ Metrics include:
 - `POST /ingest` - ingest documents from a server-side folder
 - `POST /query` - retrieve contexts and generate a grounded answer
 - `POST /evaluate` - run an evaluation dataset
+
+## Project Layout
+
+```text
+app/
+  answering.py        grounded answer generation
+  chunking.py         document splitting
+  document_loader.py  PDF/Markdown/text loading
+  embeddings.py       embedding model wrapper and local fallback
+  evaluate.py         offline RAG metrics
+  main.py             FastAPI routes
+  retrieval.py        vector retrieval and reranking
+  vector_store.py     persisted vector index
+```
 
 ## Resume Bullet
 

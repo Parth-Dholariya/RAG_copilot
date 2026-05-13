@@ -7,6 +7,10 @@ import numpy as np
 from app.chunking import Chunk
 from app.embeddings import EmbeddingModel
 
+CHUNK_MANIFEST = "chunks.jsonl"
+NUMPY_VECTORS = "vectors.npy"
+FAISS_INDEX = "faiss.index"
+
 
 class VectorStore:
     def __init__(self, index_dir: Path, embedding_model: EmbeddingModel):
@@ -24,8 +28,8 @@ class VectorStore:
         self._persist()
 
     def load(self) -> None:
-        metadata_path = self.index_dir / "chunks.jsonl"
-        vectors_path = self.index_dir / "vectors.npy"
+        metadata_path = self.index_dir / CHUNK_MANIFEST
+        vectors_path = self.index_dir / NUMPY_VECTORS
         if not metadata_path.exists() or not vectors_path.exists():
             raise FileNotFoundError(f"No index found in {self.index_dir}")
 
@@ -57,13 +61,13 @@ class VectorStore:
     def _persist(self) -> None:
         assert self.vectors is not None
         metadata = "\n".join(json.dumps(chunk.__dict__) for chunk in self.chunks)
-        (self.index_dir / "chunks.jsonl").write_text(metadata + "\n", encoding="utf-8")
-        np.save(self.index_dir / "vectors.npy", self.vectors)
+        (self.index_dir / CHUNK_MANIFEST).write_text(metadata + "\n", encoding="utf-8")
+        np.save(self.index_dir / NUMPY_VECTORS, self.vectors)
         if self._faiss_index is not None:
             try:
                 import faiss
 
-                faiss.write_index(self._faiss_index, str(self.index_dir / "faiss.index"))
+                faiss.write_index(self._faiss_index, str(self.index_dir / FAISS_INDEX))
             except Exception:
                 pass
 
@@ -81,7 +85,7 @@ class VectorStore:
 
     def _try_load_faiss(self) -> None:
         self._faiss_index = None
-        faiss_path = self.index_dir / "faiss.index"
+        faiss_path = self.index_dir / FAISS_INDEX
         if not faiss_path.exists():
             return
         try:

@@ -15,21 +15,28 @@ SUPPORTED_SUFFIXES = {".pdf", ".txt", ".md"}
 def load_documents(source_dir: Path) -> list[RawDocument]:
     if not source_dir.exists():
         raise FileNotFoundError(f"Document directory does not exist: {source_dir}")
+    if not source_dir.is_dir():
+        raise ValueError(f"Document source must be a directory: {source_dir}")
 
     documents: list[RawDocument] = []
     for path in sorted(source_dir.rglob("*")):
         if not path.is_file() or path.suffix.lower() not in SUPPORTED_SUFFIXES:
             continue
-        if path.suffix.lower() == ".pdf":
-            documents.extend(_load_pdf(path, source_dir))
-        else:
-            documents.append(
-                RawDocument(
-                    text=path.read_text(encoding="utf-8", errors="ignore"),
-                    source=str(path.relative_to(source_dir)),
-                )
-            )
+        documents.extend(_load_one(path, source_dir))
+
     return [doc for doc in documents if doc.text.strip()]
+
+
+def _load_one(path: Path, root: Path) -> list[RawDocument]:
+    if path.suffix.lower() == ".pdf":
+        return _load_pdf(path, root)
+
+    return [
+        RawDocument(
+            text=path.read_text(encoding="utf-8", errors="ignore"),
+            source=str(path.relative_to(root)),
+        )
+    ]
 
 
 def _load_pdf(path: Path, root: Path) -> list[RawDocument]:
