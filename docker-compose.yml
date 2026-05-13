@@ -1,0 +1,12 @@
+services:
+  rag-copilot:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - INDEX_DIR=/app/storage/index
+      - DOCUMENT_DIR=/app/data/sample_docs
+      - LLM_PROVIDER=extractive
+    volumes:
+      - ./storage:/app/storage
+      - ./data:/app/data

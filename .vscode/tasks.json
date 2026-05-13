@@ -1,0 +1,17 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run RAG Copilot API",
+      "type": "shell",
+      "command": "uvicorn app.main:app --reload",
+      "problemMatcher": []
+    },
+    {
+      "label": "Ingest Sample Documents",
+      "type": "shell",
+      "command": "python -m app.ingest --source data/sample_docs --index storage/index",
+      "problemMatcher": []
+    }
+  ]
+}
