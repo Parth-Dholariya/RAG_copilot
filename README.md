@@ -92,7 +92,3 @@ app/
   retrieval.py        vector retrieval and reranking
   vector_store.py     persisted vector index
 ```
-
-## Resume Bullet
-
-Built an Enterprise RAG-based Copilot for querying academic and organizational documents using semantic chunking, vector search, reranking, citation-grounded answer generation, and Recall@K/MRR/faithfulness evaluation to reduce hallucinations and improve response reliability.
